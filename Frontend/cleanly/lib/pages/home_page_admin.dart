@@ -9,6 +9,7 @@ import 'package:cleanly/pages/admin_history_page.dart';
 import 'package:cleanly/config/api_config.dart';
 import 'package:cleanly/pages/admin_complaints_page.dart';
 import 'package:intl/intl.dart';
+import 'package:cleanly/pages/admin_notification_page.dart';
 
 class HomePageAdmin extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -24,6 +25,7 @@ class _HomePageAdminState extends State<HomePageAdmin> {
   List<dynamic> _ongoingOrders = [];
   bool _isLoadingIncoming = true;
   bool _isLoadingOngoing = true;
+  bool _hasUnreadNotifications = false;
 
  String _selectedFilter = 'minggu_ini';
   double _totalRevenue = 0;
@@ -47,6 +49,7 @@ class _HomePageAdminState extends State<HomePageAdmin> {
     await Future.wait([
       _fetchIncomingOrdersCount(),
       _fetchOngoingOrders(),
+      _checkNotifications(),
       _fetchRevenue(_filters[_selectedFilter]!, isYearlyDetail: _selectedFilter == 'tahun_ini'),
     ]);
   }
@@ -149,6 +152,25 @@ class _HomePageAdminState extends State<HomePageAdmin> {
       if (mounted) {
         setState(() => _isLoadingOngoing = false);
       }
+    }
+  }
+
+   Future<void> _checkNotifications() async {
+    final adminId = widget.userData['_id'];
+    final apiUrl = '${ApiConfig.baseUrl}/api/notifications/$adminId';
+    try {
+      final response = await http.get(Uri.parse(apiUrl));
+      if (mounted && response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final bool hasUnread = (data['notifications'] as List).any((notif) => notif['isRead'] == false);
+        if (_hasUnreadNotifications != hasUnread) {
+          setState(() {
+            _hasUnreadNotifications = hasUnread;
+          });
+        }
+      }
+    } catch (e) {
+      print("Error checking admin notifications: $e");
     }
   }
 
@@ -288,7 +310,38 @@ class _HomePageAdminState extends State<HomePageAdmin> {
                         ),
                       ],
                     ),
-                    const Icon(Icons.notifications_none, color: Colors.black54, size: 30),
+                    Stack(
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.notifications_none, color: Colors.black54, size: 30),
+                          onPressed: () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => AdminNotificationPage(
+                                  adminId: widget.userData['_id'],
+                                  onNavigatedBack: _checkNotifications,
+                                ),
+                              ),
+                            );
+                            _checkNotifications(); // Cek lagi setelah kembali
+                          },
+                        ),
+                        if (_hasUnreadNotifications)
+                          Positioned(
+                            top: 10,
+                            right: 10,
+                            child: Container(
+                              width: 10,
+                              height: 10,
+                              decoration: const BoxDecoration(
+                                color: Colors.black, // Bulatan hitam
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                   ],
                 ),
               ),

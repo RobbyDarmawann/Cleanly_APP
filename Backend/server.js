@@ -130,9 +130,38 @@ app.post('/api/order', async (req, res) => {
             orderId: newOrderId,
         });
         await newOrder.save();
+
+        // --- LOGIKA DEBUGGING NOTIFIKASI ---
+        console.log('--- Memulai Proses Notifikasi Admin ---');
+        
+        console.log('1. Mencari data pengguna pemesan dengan ID:', userId);
+        const orderingUser = await User.findById(userId);
+        console.log('2. Data pengguna pemesan:', orderingUser ? 'DITEMUKAN' : 'TIDAK DITEMUKAN');
+
+        console.log('3. Mencari data admin...');
+        const adminUser = await User.findOne({ role: 'admin' });
+        console.log('4. Data admin:', adminUser ? 'DITEMUKAN' : 'TIDAK DITEMUKAN');
+
+        if (adminUser && orderingUser) {
+            console.log('5. Membuat notifikasi untuk admin...');
+            const adminNotif = new Notification({
+                userId: adminUser._id,
+                orderId: newOrderId,
+                title: 'Pesanan Baru Masuk!',
+                message: `Pesanan ${newOrderId} dari ${orderingUser.namaLengkap} telah masuk.`,
+            });
+            await adminNotif.save();
+            console.log('6. Notifikasi berhasil disimpan ke database.');
+        } else {
+            console.log('❌ GAGAL: Kondisi IF tidak terpenuhi. Salah satu user (admin atau pemesan) tidak ditemukan.');
+        }
+        console.log('--- Proses Notifikasi Admin Selesai ---');
+        // --- AKHIR LOGIKA DEBUGGING ---
+
         res.status(201).send({ message: 'Pesanan berhasil dibuat!', order: newOrder });
     } catch (error) {
-        console.error('Error membuat pesanan:', error);
+        // Jika ada error di tengah jalan, akan tercetak di sini
+        console.error('💥 ERROR BESAR saat membuat pesanan atau notifikasi:', error);
         res.status(400).send({ message: 'Gagal membuat pesanan.', error: error.message });
     }
 });
